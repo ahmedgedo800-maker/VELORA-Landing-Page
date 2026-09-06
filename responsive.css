@@ -1,0 +1,132 @@
+@media (max-width: 768px) {
+
+    nav {
+        padding: 20px;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    nav div {
+        gap: 15px;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    nav a {
+        font-size: 14px;
+    }
+
+    nav button {
+        padding: 10px 18px;
+    }
+    .hero {
+        min-height: auto;
+        flex-direction: column;
+        text-align: center;
+        padding: 60px 20px;
+        gap: 50px;
+    }
+
+    .hero-content {
+        max-width: 100%;
+    }
+
+    .hero h2 {
+        font-size: 40px;
+    }
+
+    .hero-description {
+        font-size: 16px;
+    }
+
+    .hero-image {
+        width: 280px;
+        height: 280px;
+    }
+
+    .circle {
+    width: 220px;
+    height: 220px;
+    }
+
+    .orb-center {
+    width: 90px;
+    height: 90px;
+    font-size: 55px;
+    }
+
+    .about {
+        padding: 70px 20px;
+    }
+
+    .about h2 {
+        font-size: 34px;
+    }
+
+    .about p {
+        font-size: 16px;
+    }
+
+    .services {
+        padding: 70px 20px;
+    }
+
+    .services h2 {
+        font-size: 34px;
+        margin-bottom: 35px;
+    }
+
+    .services-container {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .service-card {
+        width: 100%;
+        max-width: 500px;
+        box-sizing: border-box;
+    }
+
+
+
+    .projects {
+        padding: 70px 20px;
+    }
+
+    .projects h2 {
+        font-size: 34px;
+        margin-bottom: 35px;
+    }
+
+    .projects-container {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .project-card {
+        width: 100%;
+        max-width: 500px;
+        box-sizing: border-box;
+    }
+
+    .contact {
+        padding: 70px 20px;
+    }
+
+    .contact h2 {
+        font-size: 34px;
+    }
+
+    .contact-description {
+        font-size: 16px;
+    }
+
+    .contact-form {
+        width: 100%;
+    }
+
+    footer {
+        padding: 35px 20px;
+    }
+
+}
