@@ -7,13 +7,15 @@
     }
 
     nav div {
-        gap: 15px;
-        flex-wrap: wrap;
+        display: grid;
+        gap: 8px;
+        grid-template-columns: repeat(3,auto);
         justify-content: center;
     }
 
     nav a {
         font-size: 14px;
+        padding: 10px  14px;
     }
 
     nav button {
