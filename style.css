@@ -374,6 +374,39 @@ body::before {
     animation: backgroundMove 8s ease-in-out infinite alternate;
 }
 
+
+.nav-links {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.nav-links a {
+    text-decoration: none;
+    color: white;
+    transition: 0.3s ease;
+}
+
+.nav-links a:hover {
+    color: #60a5fa;
+    transform: translateY(-2px);
+}
+
+.get-started {
+    display: inline-block;
+    text-decoration: none;
+    background: #2563eb;
+    color: white;
+    padding: 12px 24px;
+    border-radius: 8px;
+    transition: 0.3s ease;
+}
+
+.get-started:hover {
+    background: #1d4ed8;
+    transform: translateY(-2px);
+}
+
 @keyframes backgroundMove {
     from {
         transform: translate(0, 0);
@@ -383,3 +416,4 @@ body::before {
         transform: translate(-100px, 80px);
     }
 }
+

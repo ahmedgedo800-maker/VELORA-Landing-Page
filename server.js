@@ -1,17 +1,35 @@
 const express = require("express");
 const Database = require("better-sqlite3");
+const bcrypt = require("bcryptjs");
+const session = require("express-session");
 
 const app = express();
 const PORT = 3000;
 
+
+
+app.use(
+    session({
+        secret: "velora-secret-key",
+        resave: false,
+        saveUninitialized: false,
+        cookie: {
+            httpOnly: true,
+            sameSite: "lax",
+            secure: false,
+            maxAge: 1000 * 60 * 60
+        }
+    })
+);
+
+
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const db = new Database("velora.db");
 
-// ===============================
-// Create Tables
-// ===============================
+
+const db = new Database("velora.db");
 
 db.prepare(`
     CREATE TABLE IF NOT EXISTS inquiries (
@@ -24,6 +42,7 @@ db.prepare(`
     )
 `).run();
 
+
 db.prepare(`
     CREATE TABLE IF NOT EXISTS content (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -34,177 +53,519 @@ db.prepare(`
 `).run();
 
 
-// ===============================
-// Serve Website
-// ===============================
 
-app.use(express.static(__dirname));
+db.prepare(`
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        email TEXT NOT NULL UNIQUE,
+        password TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+`).run();
 
 
-// ===============================
-// CONTACT SYSTEM
-// ===============================
+
+function requireLogin(req, res, next) {
+    if (!req.session.userId) {
+        return res.status(401).json({
+            success: false,
+            message: "You must be logged in."
+        });
+    }
+
+    next();
+}
+
+
+
+app.post("/api/register", async (req, res) => {
+    try {
+        const { name, email, password } = req.body;
+
+        // Required fields
+        if (!name || !email || !password) {
+            return res.status(400).json({
+                success: false,
+                message: "Name, email and password are required."
+            });
+        }
+
+        // Clean data
+        const cleanName = name.trim();
+        const cleanEmail = email.trim().toLowerCase();
+
+        if (!cleanName) {
+            return res.status(400).json({
+                success: false,
+                message: "Name cannot be empty."
+            });
+        }
+
+        // Email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+        if (!emailRegex.test(cleanEmail)) {
+            return res.status(400).json({
+                success: false,
+                message: "Please enter a valid email address."
+            });
+        }
+
+        // Password validation
+        if (password.length < 6) {
+            return res.status(400).json({
+                success: false,
+                message: "Password must be at least 6 characters."
+            });
+        }
+
+        // Check existing user
+        const existingUser = db
+            .prepare("SELECT id FROM users WHERE email = ?")
+            .get(cleanEmail);
+
+        if (existingUser) {
+            return res.status(409).json({
+                success: false,
+                message: "Email is already registered."
+            });
+        }
+
+        // Hash password
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Insert user
+        const statement = db.prepare(`
+            INSERT INTO users (name, email, password)
+            VALUES (?, ?, ?)
+        `);
+
+        const result = statement.run(
+            cleanName,
+            cleanEmail,
+            hashedPassword
+        );
+
+        res.status(201).json({
+            success: true,
+            message: "Account created successfully.",
+            userId: result.lastInsertRowid
+        });
+
+    } catch (error) {
+        console.error("Registration error:", error);
+
+        res.status(500).json({
+            success: false,
+            message: "Something went wrong during registration."
+        });
+    }
+});
+
+
+
+app.post("/api/login", async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        // Required fields
+        if (!email || !password) {
+            return res.status(400).json({
+                success: false,
+                message: "Email and password are required."
+            });
+        }
+
+        const cleanEmail = email.trim().toLowerCase();
+
+        // Find user
+        const user = db
+            .prepare("SELECT * FROM users WHERE email = ?")
+            .get(cleanEmail);
+
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid email or password."
+            });
+        }
+
+        // Compare password
+        const passwordMatch = await bcrypt.compare(
+            password,
+            user.password
+        );
+
+        if (!passwordMatch) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid email or password."
+            });
+        }
+
+        // Create session
+        req.session.userId = user.id;
+        req.session.userName = user.name;
+
+        res.json({
+            success: true,
+            message: "Login successful.",
+            user: {
+                id: user.id,
+                name: user.name,
+                email: user.email
+            }
+        });
+
+    } catch (error) {
+        console.error("Login error:", error);
+
+        res.status(500).json({
+            success: false,
+            message: "Something went wrong during login."
+        });
+    }
+});
+
+
+
+app.get("/api/me", (req, res) => {
+    if (!req.session.userId) {
+        return res.status(401).json({
+            success: false,
+            message: "Not logged in."
+        });
+    }
+
+    const user = db
+        .prepare(`
+            SELECT id, name, email
+            FROM users
+            WHERE id = ?
+        `)
+        .get(req.session.userId);
+
+    if (!user) {
+        req.session.destroy(() => {});
+
+        return res.status(401).json({
+            success: false,
+            message: "User not found."
+        });
+    }
+
+    res.json({
+        success: true,
+        user
+    });
+});
+
+
+
+app.post("/api/logout", (req, res) => {
+    req.session.destroy((error) => {
+        if (error) {
+            console.error("Logout error:", error);
+
+            return res.status(500).json({
+                success: false,
+                message: "Logout failed."
+            });
+        }
+
+        res.clearCookie("connect.sid");
+
+        res.json({
+            success: true,
+            message: "Logged out successfully."
+        });
+    });
+});
+
+
+app.get("/admin.html", (req, res) => {
+    if (!req.session.userId) {
+        return res.redirect("/login.html");
+    }
+
+    res.sendFile(__dirname + "/admin.html");
+});
+
 
 app.post("/api/contact", (req, res) => {
-    const { name, email, subject, message } = req.body;
+    try {
+        const { name, email, subject, message } = req.body;
 
-    if (!name || !email || !subject || !message) {
-        return res.status(400).json({
+        // Required fields
+        if (!name || !email || !subject || !message) {
+            return res.status(400).json({
+                success: false,
+                message: "Please fill in all fields."
+            });
+        }
+
+        const cleanName = name.trim();
+        const cleanEmail = email.trim().toLowerCase();
+        const cleanSubject = subject.trim();
+        const cleanMessage = message.trim();
+
+        if (!cleanName || !cleanSubject || !cleanMessage) {
+            return res.status(400).json({
+                success: false,
+                message: "Please fill in all fields."
+            });
+        }
+
+        // Email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+        if (!emailRegex.test(cleanEmail)) {
+            return res.status(400).json({
+                success: false,
+                message: "Please enter a valid email address."
+            });
+        }
+
+        // Save inquiry
+        const statement = db.prepare(`
+            INSERT INTO inquiries
+            (name, email, subject, message)
+            VALUES (?, ?, ?, ?)
+        `);
+
+        statement.run(
+            cleanName,
+            cleanEmail,
+            cleanSubject,
+            cleanMessage
+        );
+
+        res.status(201).json({
+            success: true,
+            message: "Your message has been sent successfully."
+        });
+
+    } catch (error) {
+        console.error("Contact error:", error);
+
+        res.status(500).json({
             success: false,
-            message: "Please fill in all fields."
+            message: "Something went wrong."
         });
     }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    if (!emailRegex.test(email)) {
-        return res.status(400).json({
-            success: false,
-            message: "Please enter a valid email address."
-        });
-    }
-
-    const statement = db.prepare(`
-        INSERT INTO inquiries (name, email, subject, message)
-        VALUES (?, ?, ?, ?)
-    `);
-
-    statement.run(name, email, subject, message);
-
-    res.status(201).json({
-        success: true,
-        message: "Your message has been sent successfully."
-    });
 });
 
 
-// ===============================
-// GET INQUIRIES
-// ===============================
+app.get("/api/inquiries", requireLogin, (req, res) => {
+    try {
+        const inquiries = db
+            .prepare(`
+                SELECT *
+                FROM inquiries
+                ORDER BY id DESC
+            `)
+            .all();
 
-app.get("/api/inquiries", (req, res) => {
-    const inquiries = db
-        .prepare("SELECT * FROM inquiries ORDER BY id DESC")
-        .all();
+        res.json(inquiries);
 
-    res.json(inquiries);
-});
+    } catch (error) {
+        console.error("Get inquiries error:", error);
 
-
-// ===============================
-// CONTENT SYSTEM
-// ===============================
-
-// GET ALL CONTENT
-
-app.get("/api/content", (req, res) => {
-    const content = db
-        .prepare("SELECT * FROM content ORDER BY id DESC")
-        .all();
-
-    res.json(content);
-});
-
-
-// ===============================
-// CREATE CONTENT
-// ===============================
-
-app.post("/api/content", (req, res) => {
-    const { title, description } = req.body;
-
-    if (!title || !description) {
-        return res.status(400).json({
+        res.status(500).json({
             success: false,
-            message: "Title and description are required."
+            message: "Could not load inquiries."
         });
     }
-
-    const statement = db.prepare(`
-        INSERT INTO content (title, description)
-        VALUES (?, ?)
-    `);
-
-    const result = statement.run(title, description);
-
-    res.status(201).json({
-        success: true,
-        message: "Content added successfully.",
-        id: result.lastInsertRowid
-    });
-});
-
-// ===============================
-// UPDATE CONTENT
-// ===============================
-
-app.put("/api/content/:id", (req, res) => {
-    console.log("PUT REQUEST RECEIVED:", req.params.id);
-    const id = req.params.id;
-    const { title, description } = req.body;
-
-    if (!title || !description) {
-        return res.status(400).json({
-            success: false,
-            message: "Title and description are required."
-        });
-    }
-
-    const statement = db.prepare(`
-        UPDATE content
-        SET title = ?, description = ?
-        WHERE id = ?
-    `);
-
-    const result = statement.run(title, description, id);
-
-    if (result.changes === 0) {
-        return res.status(404).json({
-            success: false,
-            message: "Content not found."
-        });
-    }
-
-    res.json({
-        success: true,
-        message: "Content updated successfully."
-    });
 });
 
 
-// ===============================
-// DELETE CONTENT
-// ===============================
+app.get("/api/content", requireLogin, (req, res) => {
+    try {
+        const content = db
+            .prepare(`
+                SELECT *
+                FROM content
+                ORDER BY id DESC
+            `)
+            .all();
 
-app.delete("/api/content/:id", (req, res) => {
-    console.log("DELETE REQUEST RECEIVED:", req.params.id);
-    const id = req.params.id;
+        res.json(content);
 
-    const statement = db.prepare(`
-        DELETE FROM content
-        WHERE id = ?
-    `);
+    } catch (error) {
+        console.error("Get content error:", error);
 
-    const result = statement.run(id);
-
-    if (result.changes === 0) {
-        return res.status(404).json({
+        res.status(500).json({
             success: false,
-            message: "Content not found."
+            message: "Could not load content."
         });
     }
-
-    res.json({
-        success: true,
-        message: "Content deleted successfully."
-    });
 });
-console.log("UPDATE and DELETE routes loaded");
 
-// ===============================
-// START SERVER
-// ===============================
+
+
+app.post("/api/content", requireLogin, (req, res) => {
+    try {
+        const { title, description } = req.body;
+
+        if (!title || !description) {
+            return res.status(400).json({
+                success: false,
+                message: "Title and description are required."
+            });
+        }
+
+        const cleanTitle = title.trim();
+        const cleanDescription = description.trim();
+
+        if (!cleanTitle || !cleanDescription) {
+            return res.status(400).json({
+                success: false,
+                message: "Title and description are required."
+            });
+        }
+
+        const statement = db.prepare(`
+            INSERT INTO content (title, description)
+            VALUES (?, ?)
+        `);
+
+        const result = statement.run(
+            cleanTitle,
+            cleanDescription
+        );
+
+        res.status(201).json({
+            success: true,
+            message: "Content added successfully.",
+            id: result.lastInsertRowid
+        });
+
+    } catch (error) {
+        console.error("Add content error:", error);
+
+        res.status(500).json({
+            success: false,
+            message: "Could not add content."
+        });
+    }
+});
+
+
+
+app.put("/api/content/:id", requireLogin, (req, res) => {
+    try {
+        console.log(
+            "PUT REQUEST RECEIVED:",
+            req.params.id
+        );
+
+        const id = req.params.id;
+        const { title, description } = req.body;
+
+        if (!title || !description) {
+            return res.status(400).json({
+                success: false,
+                message: "Title and description are required."
+            });
+        }
+
+        const cleanTitle = title.trim();
+        const cleanDescription = description.trim();
+
+        if (!cleanTitle || !cleanDescription) {
+            return res.status(400).json({
+                success: false,
+                message: "Title and description are required."
+            });
+        }
+
+        const statement = db.prepare(`
+            UPDATE content
+            SET title = ?, description = ?
+            WHERE id = ?
+        `);
+
+        const result = statement.run(
+            cleanTitle,
+            cleanDescription,
+            id
+        );
+
+        if (result.changes === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Content not found."
+            });
+        }
+
+        res.json({
+            success: true,
+            message: "Content updated successfully."
+        });
+
+    } catch (error) {
+        console.error("Update content error:", error);
+
+        res.status(500).json({
+            success: false,
+            message: "Could not update content."
+        });
+    }
+});
+
+
+
+app.delete("/api/content/:id", requireLogin, (req, res) => {
+    try {
+        console.log(
+            "DELETE REQUEST RECEIVED:",
+            req.params.id
+        );
+
+        const id = req.params.id;
+
+        const statement = db.prepare(`
+            DELETE FROM content
+            WHERE id = ?
+        `);
+
+        const result = statement.run(id);
+
+        if (result.changes === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Content not found."
+            });
+        }
+
+        res.json({
+            success: true,
+            message: "Content deleted successfully."
+        });
+
+    } catch (error) {
+        console.error("Delete content error:", error);
+
+        res.status(500).json({
+            success: false,
+            message: "Could not delete content."
+        });
+    }
+});
+
+app.use(
+    express.static(__dirname, {
+        index: "index.html"
+    })
+);
+
+
+
+console.log("All VELORA routes loaded successfully.");
 
 app.listen(PORT, () => {
-    console.log(`VELORA server is running on http://localhost:${PORT}`);
+    console.log(
+        `VELORA server is running on http://localhost:${PORT}`
+    );
 });

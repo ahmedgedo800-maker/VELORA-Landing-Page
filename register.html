@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VELORA - Register</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <header>
+        <nav>
+            <h1>VELORA</h1>
+
+            <div>
+                <a href="index.html">Home</a>
+                <a href="login.html">Login</a>
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        <section class="contact">
+
+            <p class="section-subtitle">JOIN VELORA</p>
+
+            <h2>Create Your Account</h2>
+
+            <form id="registerForm" class="contact-form">
+
+                <input
+                    type="text"
+                    id="name"
+                    name="name"
+                    placeholder="Your Name"
+                    required
+                >
+
+                <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    placeholder="Your Email"
+                    required
+                >
+
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    placeholder="Password"
+                    required
+                >
+
+                <input
+                    type="password"
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    placeholder="Confirm Password"
+                    required
+                >
+
+                <button type="submit">Create Account</button>
+
+            </form>
+
+            <p id="registerMessage"></p>
+
+            <p>
+                Already have an account?
+                <a href="login.html">Login</a>
+            </p>
+
+        </section>
+    </main>
+
+    <script src="register.js"></script>
+
+</body>
+</html>

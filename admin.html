@@ -1,22 +1,49 @@
 <!DOCTYPE html>
-
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>VELORA - Content Management</title>
+
     <link rel="stylesheet" href="admin.css">
 </head>
 
 <body>
 
-
 <div class="container">
 
-    <h1>VELORA Content Management</h1>
-    <p class="subtitle">
-        Manage your website content
-    </p>
+
+    <div class="admin-header">
+
+        <div>
+            <h1>VELORA Content Management</h1>
+
+            <p class="subtitle">
+                Manage your website content
+            </p>
+        </div>
+
+        <div class="user-section">
+
+            <span id="userWelcome">
+                Loading...
+            </span>
+
+            <button
+                type="button"
+                id="logoutBtn"
+                class="logout-btn"
+            >
+                Logout
+            </button>
+
+        </div>
+
+    </div>
+
+
 
     <div class="form-box">
 
@@ -24,7 +51,10 @@
 
         <form id="contentForm">
 
-            <label for="title">Title</label>
+            <label for="title">
+                Title
+            </label>
+
             <input
                 type="text"
                 id="title"
@@ -32,182 +62,519 @@
                 required
             >
 
-            <label for="description">Description</label>
+
+            <label for="description">
+                Description
+            </label>
+
             <textarea
                 id="description"
                 placeholder="Enter content description"
                 required
             ></textarea>
 
-            <button type="submit" class="add-btn" id="submitButton">
-                 Add Content
+
+            <button
+                type="submit"
+                class="add-btn"
+                id="submitButton"
+            >
+                Add Content
             </button>
+
         </form>
 
     </div>
+
+
 
     <div class="content-box">
 
         <h2>Existing Content</h2>
 
         <div id="contentList">
-            
         </div>
 
     </div>
 
 </div>
-<script>
-    const contentForm = document.getElementById("contentForm");
-    let editingId = null;
-    const submitButton = document.getElementById("submitButton");
-    const contentList = document.getElementById("contentList");
 
-    async function loadContent() {
+
+<script>
+
+
+    const contentForm =
+        document.getElementById("contentForm");
+
+    const submitButton =
+        document.getElementById("submitButton");
+
+    const contentList =
+        document.getElementById("contentList");
+
+    const userWelcome =
+        document.getElementById("userWelcome");
+
+    const logoutBtn =
+        document.getElementById("logoutBtn");
+
+
+    
+    let editingId = null;
+
+
+  
+
+    async function checkUser() {
+
         try {
-            const response = await fetch("/api/content");
-            const content = await response.json();
+
+            const response =
+                await fetch("/api/me");
+
+            if (!response.ok) {
+
+                window.location.href =
+                    "/login.html";
+
+                return;
+            }
+
+
+            const data =
+                await response.json();
+
+
+            if (data.success && data.user) {
+
+                userWelcome.textContent =
+                    `Welcome, ${data.user.name}`;
+
+            }
+
+        } catch (error) {
+
+            console.error(
+                "User check error:",
+                error
+            );
+
+            window.location.href =
+                "/login.html";
+        }
+    }
+
+
+   
+    logoutBtn.addEventListener(
+        "click",
+        async () => {
+
+            try {
+
+        const response =
+            await fetch(
+                        "/api/logout",
+                        {
+                            method: "POST"
+                        }
+                    );
+
+
+                const result =
+                    await response.json();
+
+
+                if (result.success) {
+
+                    window.location.href =
+                        "/login.html";
+
+                } else {
+
+                    alert(
+                        result.message ||
+                        "Logout failed."
+                    );
+
+                }
+
+            } catch (error) {
+
+                console.error(
+                    "Logout error:",
+                    error
+                );
+
+                alert(
+                    "Something went wrong."
+                );
+            }
+
+        }
+    );
+
+
+  
+    async function loadContent() {
+
+        try {
+
+            const response =
+                await fetch(
+                    "/api/content"
+                );
+
+
+            if (response.status === 401) {
+
+                window.location.href =
+                    "/login.html";
+
+                return;
+            }
+
+
+            const content =
+                await response.json();
+
 
             contentList.innerHTML = "";
 
+
             if (content.length === 0) {
-                contentList.innerHTML = "<p>No content available.</p>";
+
+                contentList.innerHTML =
+                    "<p>No content available.</p>";
+
                 return;
             }
 
-content.forEach(item => {
-    const contentItem = document.createElement("div");
 
-    contentItem.className = "content-item";
+            content.forEach(item => {
 
-    contentItem.innerHTML = `
-        <h3>${item.title}</h3>
-        <p>${item.description}</p>
+                const contentItem =
+                    document.createElement("div");
 
-        <button class="edit-btn">
-            Edit
-        </button>
 
-        <button class="delete-btn">
-            Delete
-        </button>
-    `;
-    const editButton = contentItem.querySelector(".edit-btn");
+                contentItem.className =
+                    "content-item";
 
-        editButton.addEventListener("click", () => {
-        document.getElementById("title").value = item.title;
-        document.getElementById("description").value = item.description;
 
-    editingId = item.id;
+                contentItem.innerHTML = `
 
-    submitButton.textContent = "Update Content";
-    });
-    const deleteButton = contentItem.querySelector(".delete-btn");
+                    <h3>${item.title}</h3>
 
-    deleteButton.addEventListener("click", async () => {
-        const confirmed = confirm("Are you sure you want to delete this content?");
+                    <p>${item.description}</p>
 
-        if (!confirmed) {
-            return;
-        }
+                    <button
+                        class="edit-btn"
+                        type="button"
+                    >
+                        Edit
+                    </button>
 
-        try {
-            const response = await fetch(`/api/content/${item.id}`, {
-                method: "DELETE"
+                    <button
+                        class="delete-btn"
+                        type="button"
+                    >
+                        Delete
+                    </button>
+
+                `;
+
+
+                const editButton =
+                    contentItem.querySelector(
+                        ".edit-btn"
+                    );
+
+
+                editButton.addEventListener(
+                    "click",
+                    () => {
+
+                        document.getElementById(
+                            "title"
+                        ).value = item.title;
+
+
+                        document.getElementById(
+                            "description"
+                        ).value =
+                            item.description;
+
+
+                        editingId = item.id;
+
+
+                        submitButton.textContent =
+                            "Update Content";
+
+                    }
+                );
+
+                const deleteButton =
+                    contentItem.querySelector(
+                        ".delete-btn"
+                    );
+
+
+                deleteButton.addEventListener(
+                    "click",
+                    async () => {
+
+                        const confirmed =
+                            confirm(
+                                "Are you sure you want to delete this content?"
+                            );
+
+
+                        if (!confirmed) {
+                            return;
+                        }
+
+
+                        try {
+
+                            const response =
+                                await fetch(
+                                    `/api/content/${item.id}`,
+                                    {
+                                        method: "DELETE"
+                                    }
+                                );
+
+
+                            if (
+                                response.status === 401
+                            ) {
+
+                                window.location.href =
+                                    "/login.html";
+
+                                return;
+                            }
+
+
+                            const result =
+                                await response.json();
+
+
+                            if (!response.ok) {
+
+                                alert(
+                                    result.message
+                                );
+
+                                return;
+                            }
+
+
+                            alert(
+                                "Content deleted successfully!"
+                            );
+
+
+                            loadContent();
+
+
+                        } catch (error) {
+
+                            console.error(
+                                "Error deleting content:",
+                                error
+                            );
+
+
+                            alert(
+                                "Something went wrong."
+                            );
+                        }
+
+                    }
+                );
+
+
+                contentList.appendChild(
+                    contentItem
+                );
+
             });
 
-            const result = await response.json();
 
-            if (!response.ok) {
-                alert(result.message);
+        } catch (error) {
+
+            console.error(
+                "Error loading content:",
+                error
+            );
+
+
+            contentList.innerHTML =
+                "<p>Failed to load content.</p>";
+        }
+    }
+
+
+   
+    contentForm.addEventListener(
+        "submit",
+        async function(event) {
+
+            event.preventDefault();
+
+
+            const title =
+                document.getElementById(
+                    "title"
+                ).value.trim();
+
+
+            const description =
+                document.getElementById(
+                    "description"
+                ).value.trim();
+
+
+            if (!title || !description) {
+
+                alert(
+                    "Please fill in all fields."
+                );
+
                 return;
             }
 
-            alert("Content deleted successfully!");
 
-            loadContent();
+            try {
 
-        } catch (error) {
-            console.error("Error deleting content:", error);
-            alert("Something went wrong.");
+                let response;
+
+
+              
+                if (editingId !== null) {
+
+                    response =
+                        await fetch(
+                            `/api/content/${editingId}`,
+                            {
+                                method: "PUT",
+
+                                headers: {
+                                    "Content-Type":
+                                        "application/json"
+                                },
+
+                                body: JSON.stringify({
+                                    title: title,
+                                    description:
+                                        description
+                                })
+                            }
+                        );
+
+
+
+                } else {
+
+                    response =
+                        await fetch(
+                            "/api/content",
+                            {
+                                method: "POST",
+
+                                headers: {
+                                    "Content-Type":
+                                        "application/json"
+                                },
+
+                                body: JSON.stringify({
+                                    title: title,
+                                    description:
+                                        description
+                                })
+                            }
+                        );
+                }
+
+
+           
+                if (
+                    response.status === 401
+                ) {
+
+                    window.location.href =
+                        "/login.html";
+
+                    return;
+                }
+
+
+                const result =
+                    await response.json();
+
+
+                if (!response.ok) {
+
+                    alert(
+                        result.message
+                    );
+
+                    return;
+                }
+
+
+                if (editingId !== null) {
+
+                    alert(
+                        "Content updated successfully!"
+                    );
+
+                } else {
+
+                    alert(
+                        "Content added successfully!"
+                    );
+                }
+
+
+
+                editingId = null;
+
+                submitButton.textContent =
+                    "Add Content";
+
+
+                contentForm.reset();
+
+
+
+                loadContent();
+
+
+            } catch (error) {
+
+                console.error(
+                    "Error saving content:",
+                    error
+                );
+
+
+                alert(
+                    "Something went wrong."
+                );
+            }
+
         }
-    });
+    );
 
-    contentList.appendChild(contentItem);
-});
 
-        } catch (error) {
-            console.error("Error loading content:", error);
-            contentList.innerHTML = "<p>Failed to load content.</p>";
-        }
-    }
 
-contentForm.addEventListener("submit", async function(event) {
-    event.preventDefault();
-
-    const title = document.getElementById("title").value.trim();
-    const description = document.getElementById("description").value.trim();
-
-    if (!title || !description) {
-        alert("Please fill in all fields.");
-        return;
-    }
-
-    try {
-        let response;
-
-        if (editingId !== null) {
-            response = await fetch(`/api/content/${editingId}`, {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    title: title,
-                    description: description
-                })
-            });
-        } else {
-            response = await fetch("/api/content", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    title: title,
-                    description: description
-                })
-            });
-        }
-
-        const result = await response.json();
-
-        if (!response.ok) {
-            alert(result.message);
-            return;
-        }
-
-        if (editingId !== null) {
-            alert("Content updated successfully!");
-        } else {
-            alert("Content added successfully!");
-        }
-
-        editingId = null;
-        submitButton.textContent = "Add Content";
-
-        contentForm.reset();
-
-        loadContent();
-
-    } catch (error) {
-        console.error("Error saving content:", error);
-        alert("Something went wrong.");
-    }
-});
-
+    checkUser();
 
     loadContent();
+
 </script>
 
 </body>
