@@ -29,7 +29,7 @@ loginForm.addEventListener("submit", async (event) => {
         loginMessage.textContent = data.message;
 
         setTimeout(() => {
-            window.location.href = "admin.html";
+            window.location.href = "customer.html";
         }, 1000);
 
     } catch (error) {
