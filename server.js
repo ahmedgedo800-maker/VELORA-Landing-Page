@@ -52,6 +52,48 @@ db.prepare(`
 `).run();
 
 
+db.prepare(`
+    CREATE TABLE IF NOT EXISTS services (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+`).run();
+
+
+const serviceCount = db
+    .prepare("SELECT COUNT(*) AS count FROM services")
+    .get().count;
+
+if (serviceCount === 0) {
+    const insertService = db.prepare(`
+        INSERT INTO services (title, description)
+        VALUES (?, ?)
+    `);
+
+    const seedServices = db.transaction(() => {
+        insertService.run(
+            "Web Development",
+            "We build modern and responsive websites that deliver great user experiences."
+        );
+
+        insertService.run(
+            "UI/UX Design",
+            "We design simple and engaging interfaces focused on users and their needs."
+        );
+
+        insertService.run(
+            "Digital Solutions",
+            "We create smart digital solutions that help businesses grow and work more efficiently."
+        );
+    });
+
+    seedServices();
+}
+
+
+
 
 db.prepare(`
     CREATE TABLE IF NOT EXISTS users (
@@ -803,6 +845,181 @@ app.delete("/api/content/:id", requireLogin, (req, res) => {
 });
 
 
+
+// Public: the website can read services without logging in
+app.get("/api/services", (req, res) => {
+    try {
+        const services = db
+            .prepare(`
+                SELECT id, title, description, created_at
+                FROM services
+                ORDER BY id ASC
+            `)
+            .all();
+
+        res.json({
+            success: true,
+            services: services
+        });
+    } catch (error) {
+        console.error("Get services error:", error);
+
+        res.status(500).json({
+            success: false,
+            message: "Could not load services."
+        });
+    }
+});
+
+// Protected: create service
+app.post("/api/services", requireLogin, (req, res) => {
+    try {
+        const { title, description } = req.body;
+
+        if (!title || !description) {
+            return res.status(400).json({
+                success: false,
+                message: "Title and description are required."
+            });
+        }
+
+        const cleanTitle = title.trim();
+        const cleanDescription = description.trim();
+
+        if (!cleanTitle || !cleanDescription) {
+            return res.status(400).json({
+                success: false,
+                message: "Title and description are required."
+            });
+        }
+
+        const result = db.prepare(`
+            INSERT INTO services (title, description)
+            VALUES (?, ?)
+        `).run(cleanTitle, cleanDescription);
+
+        const service = db.prepare(`
+            SELECT id, title, description, created_at
+            FROM services
+            WHERE id = ?
+        `).get(result.lastInsertRowid);
+
+        res.status(201).json({
+            success: true,
+            message: "Service created successfully.",
+            service: service
+        });
+    } catch (error) {
+        console.error("Create service error:", error);
+
+        res.status(500).json({
+            success: false,
+            message: "Could not create service."
+        });
+    }
+});
+
+// Protected: update service
+app.put("/api/services/:id", requireLogin, (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const { title, description } = req.body;
+
+        if (!Number.isInteger(id) || id <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid service ID."
+            });
+        }
+
+        if (!title || !description) {
+            return res.status(400).json({
+                success: false,
+                message: "Title and description are required."
+            });
+        }
+
+        const cleanTitle = title.trim();
+        const cleanDescription = description.trim();
+
+        if (!cleanTitle || !cleanDescription) {
+            return res.status(400).json({
+                success: false,
+                message: "Title and description are required."
+            });
+        }
+
+        const result = db.prepare(`
+            UPDATE services
+            SET title = ?, description = ?
+            WHERE id = ?
+        `).run(cleanTitle, cleanDescription, id);
+
+        if (result.changes === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Service not found."
+            });
+        }
+
+        const service = db.prepare(`
+            SELECT id, title, description, created_at
+            FROM services
+            WHERE id = ?
+        `).get(id);
+
+        res.json({
+            success: true,
+            message: "Service updated successfully.",
+            service: service
+        });
+    } catch (error) {
+        console.error("Update service error:", error);
+
+        res.status(500).json({
+            success: false,
+            message: "Could not update service."
+        });
+    }
+});
+
+
+app.delete("/api/services/:id", requireLogin, (req, res) => {
+    try {
+        const id = Number(req.params.id);
+
+        if (!Number.isInteger(id) || id <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid service ID."
+            });
+        }
+
+        const result = db.prepare(`
+            DELETE FROM services
+            WHERE id = ?
+        `).run(id);
+
+        if (result.changes === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Service not found."
+            });
+        }
+
+        res.json({
+            success: true,
+            message: "Service deleted successfully."
+        });
+    } catch (error) {
+        console.error("Delete service error:", error);
+
+        res.status(500).json({
+            success: false,
+            message: "Could not delete service."
+        });
+    }
+});
 
 app.use(
     express.static(__dirname, {

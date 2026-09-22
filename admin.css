@@ -118,3 +118,85 @@ button {
 .delete-btn:hover {
     opacity: 0.85;
 }
+
+/* =========================
+   ADMIN DASHBOARD HEADER
+   ========================= */
+
+.admin-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 30px;
+    padding: 22px 25px;
+    background: #1f2937;
+    border: 1px solid #374151;
+    border-radius: 12px;
+}
+
+.user-section {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.user-section span {
+    color: #d1d5db;
+}
+
+.logout-btn {
+    background: #dc2626;
+    color: white;
+}
+
+.logout-btn:hover {
+    background: #ef4444;
+}
+
+.box-description {
+    color: #9ca3af;
+    margin: -8px 0 20px;
+    line-height: 1.6;
+}
+
+.cancel-btn {
+    background: #4b5563;
+    color: white;
+    margin-left: 8px;
+}
+
+.cancel-btn:hover {
+    background: #6b7280;
+}
+
+.services-loading,
+.services-empty {
+    color: #9ca3af;
+    padding: 10px 0;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+@media (max-width: 700px) {
+    body {
+        padding: 20px;
+    }
+
+    .admin-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .user-section {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .cancel-btn {
+        margin-left: 0;
+        margin-top: 10px;
+    }
+}
