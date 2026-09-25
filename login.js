@@ -29,7 +29,10 @@ loginForm.addEventListener("submit", async (event) => {
         loginMessage.textContent = data.message;
 
         setTimeout(() => {
-            window.location.href = "customer.html";
+            window.location.href =
+                data.user && data.user.role === "admin"
+                    ? "admin.html"
+                    : "customer.html";
         }, 1000);
 
     } catch (error) {

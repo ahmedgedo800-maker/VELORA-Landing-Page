@@ -200,3 +200,73 @@ button {
         margin-top: 10px;
     }
 }
+
+
+/* =========================
+   CUSTOMER REQUESTS
+   ========================= */
+
+.request-status {
+    font-weight: bold;
+}
+
+.request-filters {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.request-filters label {
+    color: #d1d5db;
+    font-weight: bold;
+}
+
+.request-filters select,
+.request-controls select {
+    padding: 10px 12px;
+    border: 1px solid #4b5563;
+    border-radius: 6px;
+    background: #111827;
+    color: white;
+}
+
+.request-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.request-controls label {
+    color: #d1d5db;
+}
+
+.request-controls button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.content-item small {
+    color: #9ca3af;
+    display: block;
+    margin-top: 10px;
+}
+
+#requestMessage {
+    color: #93c5fd;
+    margin-top: 12px;
+}
+
+@media (max-width: 700px) {
+    .request-filters,
+    .request-controls {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .request-controls select,
+    .request-controls button {
+        width: 100%;
+    }
+}

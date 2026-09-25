@@ -136,6 +136,29 @@
 
     </div>
 
+
+    <div class="content-box">
+        <h2>Customer Service Requests</h2>
+        <p class="box-description">
+            Review customer requests and update their status while the company processes them.
+        </p>
+
+        <div id="requestFilters" class="request-filters">
+            <label for="requestStatusFilter">Filter by status</label>
+            <select id="requestStatusFilter">
+                <option value="All">All</option>
+                <option value="Pending">Pending</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Resolved">Resolved</option>
+                <option value="Rejected">Rejected</option>
+            </select>
+        </div>
+
+        <div id="adminRequests">
+            <p>Loading customer requests...</p>
+        </div>
+    </div>
+
 </div>
 
 <script src="admin.js"></script>

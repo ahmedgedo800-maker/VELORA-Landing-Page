@@ -37,6 +37,11 @@ async function checkUser() {
             return false;
         }
 
+        if (data.user.role !== "admin") {
+            window.location.href = "/customer.html";
+            return false;
+        }
+
         userWelcome.textContent = `Welcome, ${data.user.name}`;
         return true;
 
@@ -450,4 +455,164 @@ contentForm.addEventListener("submit", async (event) => {
 
     await loadServices();
     await loadContent();
+})();
+
+
+// ==================== CUSTOMER REQUEST MANAGEMENT ====================
+
+const adminRequests = document.getElementById("adminRequests");
+const requestStatusFilter = document.getElementById("requestStatusFilter");
+
+let allCustomerRequests = [];
+
+async function loadCustomerRequests() {
+    try {
+        const response = await fetch("/api/admin/requests");
+
+        if (response.status === 401) {
+            window.location.href = "/login.html";
+            return;
+        }
+
+        if (response.status === 403) {
+            window.location.href = "/customer.html";
+            return;
+        }
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || "Could not load requests.");
+        }
+
+        allCustomerRequests = data.requests;
+        renderCustomerRequests();
+    } catch (error) {
+        console.error("Load customer requests error:", error);
+        adminRequests.innerHTML =
+            "<p>Failed to load customer requests.</p>";
+    }
+}
+
+function renderCustomerRequests() {
+    const filter = requestStatusFilter.value;
+
+    const requests = filter === "All"
+        ? allCustomerRequests
+        : allCustomerRequests.filter(request => request.status === filter);
+
+    adminRequests.innerHTML = "";
+
+    if (requests.length === 0) {
+        adminRequests.innerHTML = "<p>No requests found.</p>";
+        return;
+    }
+
+    requests.forEach(request => {
+        const item = document.createElement("div");
+        item.className = "content-item request-item";
+
+        const title = document.createElement("h3");
+        title.textContent = `#${request.id} - ${request.title}`;
+
+        const customer = document.createElement("p");
+        customer.textContent =
+            `Customer: ${request.customer_name} (${request.customer_email})`;
+
+        const description = document.createElement("p");
+        description.textContent = request.description;
+
+        const created = document.createElement("small");
+        created.textContent =
+            `Created: ${request.created_at} | Updated: ${request.updated_at}`;
+
+        const controls = document.createElement("div");
+        controls.className = "request-controls";
+
+        const label = document.createElement("label");
+        label.textContent = "Status: ";
+
+        const select = document.createElement("select");
+        [
+            "Pending",
+            "In Progress",
+            "Resolved",
+            "Rejected"
+        ].forEach(status => {
+            const option = document.createElement("option");
+            option.value = status;
+            option.textContent = status;
+            option.selected = status === request.status;
+            select.appendChild(option);
+        });
+
+        const updateButton = document.createElement("button");
+        updateButton.type = "button";
+        updateButton.className = "add-btn";
+        updateButton.textContent = "Update Status";
+
+        updateButton.addEventListener("click", async () => {
+            try {
+                updateButton.disabled = true;
+
+                const response = await fetch(
+                    `/api/admin/requests/${request.id}/status`,
+                    {
+                        method: "PATCH",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({
+                            status: select.value
+                        })
+                    }
+                );
+
+                if (response.status === 401) {
+                    window.location.href = "/login.html";
+                    return;
+                }
+
+                if (response.status === 403) {
+                    window.location.href = "/customer.html";
+                    return;
+                }
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    alert(data.message || "Could not update status.");
+                    return;
+                }
+
+                await loadCustomerRequests();
+            } catch (error) {
+                console.error("Update request status error:", error);
+                alert("Something went wrong.");
+            } finally {
+                updateButton.disabled = false;
+            }
+        });
+
+        controls.appendChild(label);
+        controls.appendChild(select);
+        controls.appendChild(updateButton);
+
+        item.appendChild(title);
+        item.appendChild(customer);
+        item.appendChild(description);
+        item.appendChild(created);
+        item.appendChild(controls);
+
+        adminRequests.appendChild(item);
+    });
+}
+
+requestStatusFilter.addEventListener("change", renderCustomerRequests);
+
+const originalStartDashboard = null;
+
+// Load requests after the existing dashboard data is ready.
+(async function loadRequestsAfterDashboard() {
+    await loadCustomerRequests();
 })();

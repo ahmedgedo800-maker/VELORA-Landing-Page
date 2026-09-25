@@ -164,6 +164,45 @@
 
         </div>
 
+    
+        <div class="form-box">
+            <h2>Submit a Service Request</h2>
+            <p class="box-description">
+                Tell us what you need help with. Your request will start as Pending
+                and the company team will update its status while processing it.
+            </p>
+
+            <form id="requestForm">
+                <label for="requestTitle">Request Title</label>
+                <input
+                    type="text"
+                    id="requestTitle"
+                    placeholder="e.g. Website issue"
+                    required
+                >
+
+                <label for="requestDescription">Description</label>
+                <textarea
+                    id="requestDescription"
+                    placeholder="Describe your request in detail..."
+                    required
+                ></textarea>
+
+                <button type="submit" class="add-btn">
+                    Submit Request
+                </button>
+            </form>
+
+            <p id="requestMessage"></p>
+        </div>
+
+        <div class="content-box">
+            <h2>My Service Requests</h2>
+            <div id="myRequests">
+                <p>Loading requests...</p>
+            </div>
+        </div>
+
     </main>
 
 

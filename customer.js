@@ -314,3 +314,110 @@ logoutBtn.addEventListener(
 
 
 loadUser();
+
+// ==================== CUSTOMER REQUEST MANAGEMENT ====================
+
+const requestForm = document.getElementById("requestForm");
+const requestTitle = document.getElementById("requestTitle");
+const requestDescription = document.getElementById("requestDescription");
+const requestMessage = document.getElementById("requestMessage");
+const myRequests = document.getElementById("myRequests");
+
+async function loadMyRequests() {
+    try {
+        const response = await fetch("/api/requests/my");
+
+        if (response.status === 401) {
+            window.location.href = "/login.html";
+            return;
+        }
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || "Could not load requests.");
+        }
+
+        myRequests.innerHTML = "";
+
+        if (data.requests.length === 0) {
+            myRequests.innerHTML = "<p>No service requests yet.</p>";
+            return;
+        }
+
+        data.requests.forEach(request => {
+            const item = document.createElement("div");
+            item.className = "content-item";
+
+            const title = document.createElement("h3");
+            title.textContent = `#${request.id} - ${request.title}`;
+
+            const status = document.createElement("p");
+            status.className = "request-status";
+            status.textContent = `Status: ${request.status}`;
+
+            const description = document.createElement("p");
+            description.textContent = request.description;
+
+            const dates = document.createElement("small");
+            dates.textContent =
+                `Created: ${request.created_at} | Updated: ${request.updated_at}`;
+
+            item.appendChild(title);
+            item.appendChild(status);
+            item.appendChild(description);
+            item.appendChild(dates);
+
+            myRequests.appendChild(item);
+        });
+    } catch (error) {
+        console.error("Load requests error:", error);
+        myRequests.innerHTML = "<p>Failed to load your requests.</p>";
+    }
+}
+
+requestForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const title = requestTitle.value.trim();
+    const description = requestDescription.value.trim();
+
+    if (!title || !description) {
+        requestMessage.textContent = "Please fill in all request fields.";
+        return;
+    }
+
+    try {
+        const response = await fetch("/api/requests", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ title, description })
+        });
+
+        if (response.status === 401) {
+            window.location.href = "/login.html";
+            return;
+        }
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            requestMessage.textContent =
+                data.message || "Could not submit request.";
+            return;
+        }
+
+        requestMessage.textContent = data.message;
+        requestForm.reset();
+
+        await loadMyRequests();
+    } catch (error) {
+        console.error("Submit request error:", error);
+        requestMessage.textContent =
+            "Something went wrong. Please try again.";
+    }
+});
+
+loadMyRequests();

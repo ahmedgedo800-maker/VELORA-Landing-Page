@@ -101,7 +101,8 @@ db.prepare(`
         name TEXT NOT NULL,
         email TEXT NOT NULL UNIQUE,
         password TEXT NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        role TEXT NOT NULL DEFAULT 'customer'
     )
 `).run();
 
@@ -118,12 +119,64 @@ try {
     
 }
 
+try {
+    db.prepare(`
+        ALTER TABLE users
+        ADD COLUMN role TEXT NOT NULL DEFAULT 'customer'
+    `).run();
+} catch (error) {
+    // Role column already exists.
+}
+
+db.prepare(`
+    CREATE TABLE IF NOT EXISTS service_requests (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'Pending',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+`).run();
+
+const firstUser = db.prepare("SELECT id FROM users ORDER BY id ASC LIMIT 1").get();
+if (firstUser) {
+    const hasAdmin = db.prepare("SELECT id FROM users WHERE role = 'admin' LIMIT 1").get();
+    if (!hasAdmin) {
+        db.prepare("UPDATE users SET role = 'admin' WHERE id = ?").run(firstUser.id);
+    }
+}
+
+
+
 
 function requireLogin(req, res, next) {
     if (!req.session.userId) {
         return res.status(401).json({
             success: false,
             message: "You must be logged in."
+        });
+    }
+
+    next();
+}
+
+function requireAdmin(req, res, next) {
+    if (!req.session.userId) {
+        return res.status(401).json({
+            success: false,
+            message: "You must be logged in."
+        });
+    }
+
+    const user = db.prepare("SELECT role FROM users WHERE id = ?").get(req.session.userId);
+
+    if (!user || user.role !== "admin") {
+        return res.status(403).json({
+            success: false,
+            message: "Company admin access is required."
         });
     }
 
@@ -185,8 +238,8 @@ app.post("/api/register", async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const statement = db.prepare(`
-            INSERT INTO users (name, email, password)
-            VALUES (?, ?, ?)
+            INSERT INTO users (name, email, password, role)
+            VALUES (?, ?, ?, 'customer')
         `);
 
         const result = statement.run(
@@ -264,7 +317,8 @@ app.post("/api/login", async (req, res) => {
             user: {
                 id: user.id,
                 name: user.name,
-                email: user.email
+                email: user.email,
+                role: user.role
             }
         });
 
@@ -284,7 +338,7 @@ app.get("/api/me", requireLogin, (req, res) => {
     try {
         const user = db
             .prepare(`
-                SELECT id, name, email, secondary_email
+                SELECT id, name, email, secondary_email, role
                 FROM users
                 WHERE id = ?
             `)
@@ -547,6 +601,14 @@ app.get("/admin.html", (req, res) => {
         return res.redirect("/login.html");
     }
 
+    const user = db
+        .prepare("SELECT role FROM users WHERE id = ?")
+        .get(req.session.userId);
+
+    if (!user || user.role !== "admin") {
+        return res.redirect("/customer.html");
+    }
+
     res.sendFile(__dirname + "/admin.html");
 });
 
@@ -649,7 +711,7 @@ app.get("/api/inquiries", requireLogin, (req, res) => {
 });
 
 
-app.get("/api/content", requireLogin, (req, res) => {
+app.get("/api/content", requireAdmin, (req, res) => {
     try {
 
         const content = db
@@ -674,7 +736,7 @@ app.get("/api/content", requireLogin, (req, res) => {
 });
 
 
-app.post("/api/content", requireLogin, (req, res) => {
+app.post("/api/content", requireAdmin, (req, res) => {
     try {
 
         const {
@@ -729,7 +791,7 @@ app.post("/api/content", requireLogin, (req, res) => {
 
 
 
-app.put("/api/content/:id", requireLogin, (req, res) => {
+app.put("/api/content/:id", requireAdmin, (req, res) => {
     try {
 
         console.log(
@@ -801,7 +863,7 @@ app.put("/api/content/:id", requireLogin, (req, res) => {
 
 
 
-app.delete("/api/content/:id", requireLogin, (req, res) => {
+app.delete("/api/content/:id", requireAdmin, (req, res) => {
     try {
 
         console.log(
@@ -846,6 +908,142 @@ app.delete("/api/content/:id", requireLogin, (req, res) => {
 
 
 
+
+// ==================== CUSTOMER REQUEST MANAGEMENT ====================
+
+app.post("/api/requests", requireLogin, (req, res) => {
+    try {
+        const { title, description } = req.body;
+        const cleanTitle = typeof title === "string" ? title.trim() : "";
+        const cleanDescription = typeof description === "string" ? description.trim() : "";
+
+        if (!cleanTitle || !cleanDescription) {
+            return res.status(400).json({
+                success: false,
+                message: "Title and description are required."
+            });
+        }
+
+        const result = db.prepare(`
+            INSERT INTO service_requests
+                (user_id, title, description, status, updated_at)
+            VALUES (?, ?, ?, 'Pending', CURRENT_TIMESTAMP)
+        `).run(req.session.userId, cleanTitle, cleanDescription);
+
+        const request = db.prepare(`
+            SELECT id, title, description, status, created_at, updated_at
+            FROM service_requests
+            WHERE id = ?
+        `).get(result.lastInsertRowid);
+
+        res.status(201).json({
+            success: true,
+            message: "Request submitted successfully.",
+            request
+        });
+    } catch (error) {
+        console.error("Create request error:", error);
+        res.status(500).json({
+            success: false,
+            message: "Could not submit request."
+        });
+    }
+});
+
+app.get("/api/requests/my", requireLogin, (req, res) => {
+    try {
+        const requests = db.prepare(`
+            SELECT id, title, description, status, created_at, updated_at
+            FROM service_requests
+            WHERE user_id = ?
+            ORDER BY id DESC
+        `).all(req.session.userId);
+
+        res.json({ success: true, requests });
+    } catch (error) {
+        console.error("Get my requests error:", error);
+        res.status(500).json({
+            success: false,
+            message: "Could not load your requests."
+        });
+    }
+});
+
+app.get("/api/admin/requests", requireAdmin, (req, res) => {
+    try {
+        const requests = db.prepare(`
+            SELECT
+                r.id,
+                r.title,
+                r.description,
+                r.status,
+                r.created_at,
+                r.updated_at,
+                u.id AS customer_id,
+                u.name AS customer_name,
+                u.email AS customer_email
+            FROM service_requests r
+            JOIN users u ON u.id = r.user_id
+            ORDER BY r.id DESC
+        `).all();
+
+        res.json({ success: true, requests });
+    } catch (error) {
+        console.error("Get admin requests error:", error);
+        res.status(500).json({
+            success: false,
+            message: "Could not load customer requests."
+        });
+    }
+});
+
+app.patch("/api/admin/requests/:id/status", requireAdmin, (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const { status } = req.body;
+        const allowedStatuses = ["Pending", "In Progress", "Resolved", "Rejected"];
+
+        if (!Number.isInteger(id) || id <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid request ID."
+            });
+        }
+
+        if (!allowedStatuses.includes(status)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid request status."
+            });
+        }
+
+        const result = db.prepare(`
+            UPDATE service_requests
+            SET status = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        `).run(status, id);
+
+        if (result.changes === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Request not found."
+            });
+        }
+
+        res.json({
+            success: true,
+            message: "Request status updated successfully."
+        });
+    } catch (error) {
+        console.error("Update request status error:", error);
+        res.status(500).json({
+            success: false,
+            message: "Could not update request status."
+        });
+    }
+});
+
+
 // Public: the website can read services without logging in
 app.get("/api/services", (req, res) => {
     try {
@@ -872,7 +1070,7 @@ app.get("/api/services", (req, res) => {
 });
 
 // Protected: create service
-app.post("/api/services", requireLogin, (req, res) => {
+app.post("/api/services", requireAdmin, (req, res) => {
     try {
         const { title, description } = req.body;
 
@@ -920,7 +1118,7 @@ app.post("/api/services", requireLogin, (req, res) => {
 });
 
 // Protected: update service
-app.put("/api/services/:id", requireLogin, (req, res) => {
+app.put("/api/services/:id", requireAdmin, (req, res) => {
     try {
         const id = Number(req.params.id);
         const { title, description } = req.body;
@@ -984,7 +1182,7 @@ app.put("/api/services/:id", requireLogin, (req, res) => {
 });
 
 
-app.delete("/api/services/:id", requireLogin, (req, res) => {
+app.delete("/api/services/:id", requireAdmin, (req, res) => {
     try {
         const id = Number(req.params.id);
 
